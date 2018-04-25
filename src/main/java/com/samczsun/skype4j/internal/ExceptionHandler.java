@@ -17,92 +17,60 @@
 package com.samczsun.skype4j.internal;
 
 import com.samczsun.skype4j.exceptions.ConnectionException;
-import sun.net.www.MessageHeader;
-import sun.net.www.URLConnection;
-import sun.net.www.http.HttpClient;
-import sun.net.www.protocol.https.HttpsURLConnectionImpl;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
-import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class ExceptionHandler {
-    private static final boolean DEBUG;
-    private static Field POSTER_FIELD;
-    private static Field DELEGATE_FIELD;
-    private static Field REQUESTS_FIELD;
-
-    static {
-        DEBUG = AccessController.doPrivileged((PrivilegedAction<Boolean>) () -> Boolean.getBoolean("com.samczsun.skype4j.debugExceptions"));
-        try {
-            POSTER_FIELD = sun.net.www.protocol.http.HttpURLConnection.class.getDeclaredField("poster");
-            POSTER_FIELD.setAccessible(true);
-        } catch (NoSuchFieldException ignored) {
-        }
-        try {
-            DELEGATE_FIELD = sun.net.www.protocol.https.HttpsURLConnectionImpl.class.getDeclaredField("delegate");
-            DELEGATE_FIELD.setAccessible(true);
-        } catch (NoSuchFieldException ignored) {
-        }
-        try {
-            REQUESTS_FIELD = sun.net.www.protocol.http.HttpURLConnection.class.getDeclaredField("requests");
-            REQUESTS_FIELD.setAccessible(true);
-        } catch (NoSuchFieldException ignored) {
-        }
-    }
+    private static final boolean DEBUG =
+            AccessController.doPrivileged((PrivilegedAction<Boolean>) () ->
+                    Boolean.getBoolean("com.samczsun.skype4j.debugExceptions"));
 
     public static ConnectionException generateException(String reason, HttpURLConnection connection) {
         try {
             if (DEBUG) {
-                Object reflect = connection;
-                if (reflect instanceof HttpsURLConnectionImpl && DELEGATE_FIELD != null) {
-                    try {
-                        reflect = DELEGATE_FIELD.get(reflect);
-                    } catch (ReflectiveOperationException ignored) {
-                    }
-                }
                 System.err.println("URL");
                 System.err.println("\t" + connection.getURL());
-                try {
-                    MessageHeader messageHeader = (MessageHeader) REQUESTS_FIELD.get(reflect);
-                    System.err.println("Request headers");
-                    for (Map.Entry<String, List<String>> header : messageHeader.getHeaders(null).entrySet()) {
-                        System.err.println(String.format("\t%s - %s", header.getKey(), header.getValue()));
-                    }
-                } catch (ReflectiveOperationException ignored) {
-
-                }
-                System.err.println("Response headers");
-                for (Map.Entry<String, List<String>> header : connection.getHeaderFields().entrySet()) {
-                    System.err.println(String.format("\t%s - %s", header.getKey(), header.getValue()));
-                }
-                if (reflect instanceof sun.net.www.protocol.http.HttpURLConnection && POSTER_FIELD != null) {
-                    try {
-                        ByteArrayOutputStream poster = (ByteArrayOutputStream) POSTER_FIELD.get(reflect);
-                        if (poster != null) {
-                            System.err.println("Post data");
-                            System.err.println("\t" + new String(poster.toByteArray()));
-                        }
-                    } catch (ReflectiveOperationException ignored) {
-                    }
-                }
+//                printRequestHeaders(connection);
+                printResponseHeaders(connection);
+                printPostData(connection);
             }
             return new ConnectionException(reason, connection);
         } catch (IOException e) {
             throw new RuntimeException(String.format("IOException while constructing exception (%s, %s)", reason, connection));
         } finally {
             connection.disconnect();
+        }
+    }
+
+    private static void printPostData(HttpURLConnection connection) {
+
+        System.err.println("Post data");
+        try {
+            System.err.println("\t" + connection.getOutputStream());
+        } catch (IOException ignored) {
+
+        }
+    }
+
+    private static void printResponseHeaders(HttpURLConnection connection) {
+        System.err.println("Response headers");
+        for (Map.Entry<String, List<String>> header : connection.getHeaderFields().entrySet()) {
+            System.err.println(String.format("\t%s - %s", header.getKey(), header.getValue()));
+        }
+    }
+
+    private static void printRequestHeaders(HttpURLConnection connection) {
+        for (String header : connection.getRequestProperties().keySet()) {
+            if (header != null) {
+                for (String value : connection.getRequestProperties().get(header)) {
+                    System.out.println(header + ":" + value);
+                }
+            }
         }
     }
 
