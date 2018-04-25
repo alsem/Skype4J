@@ -300,7 +300,8 @@ public class Endpoints {
         }
 
         public E_TYPE post(JsonValue json) throws ConnectionException {
-            return header("Content-Type", "application/json").connect("POST", json.toString());
+            return header("Content-Type", "application/json")
+                    .header("Accept","application/json").connect("POST", json.toString());
         }
 
         public E_TYPE put() throws ConnectionException {
