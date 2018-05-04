@@ -16,6 +16,28 @@
 
 package com.samczsun.skype4j.internal.client;
 
+import java.net.HttpURLConnection;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.xml.bind.DatatypeConverter;
+
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
 import com.eclipsesource.json.JsonValue;
@@ -26,26 +48,14 @@ import com.samczsun.skype4j.exceptions.ConnectionException;
 import com.samczsun.skype4j.exceptions.InvalidCredentialsException;
 import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
 import com.samczsun.skype4j.exceptions.handler.ErrorSource;
-import com.samczsun.skype4j.internal.*;
+import com.samczsun.skype4j.internal.Endpoints;
+import com.samczsun.skype4j.internal.ExceptionHandler;
+import com.samczsun.skype4j.internal.SkypeImpl;
 import com.samczsun.skype4j.internal.participants.info.ContactImpl;
 import com.samczsun.skype4j.internal.participants.info.ContactRequestImpl;
 import com.samczsun.skype4j.internal.utils.Encoder;
 import com.samczsun.skype4j.internal.utils.UncheckedRunnable;
 import com.samczsun.skype4j.participants.info.Contact;
-
-import javax.xml.bind.DatatypeConverter;
-import java.net.HttpURLConnection;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class FullClient extends SkypeImpl {
     private static final Pattern URL_PATTERN = Pattern.compile("threads/(.*)", Pattern.CASE_INSENSITIVE);
@@ -130,27 +140,33 @@ public class FullClient extends SkypeImpl {
 
     @Override
     public void getContactRequests(boolean fromWebsocket) throws ConnectionException {
-        JsonArray array =  Endpoints.AUTH_REQUESTS_URL
-                .open(this)
-                .as(JsonArray.class)
-                .expect(200, "While loading authorization requests")
-                .get();
-        for (JsonValue contactRequest : array) {
-            JsonObject contactRequestObj = contactRequest.asObject();
-            try {
-                ContactRequestImpl request = new ContactRequestImpl(contactRequestObj.get("event_time").asString(),
-                        contactRequestObj.get("sender").asString(),
-                        contactRequestObj.get("greeting").asString(), this);
-                if (this.allContactRequests.add(request)) {
-                    if (fromWebsocket) {
+		JsonObject array = Endpoints.GET_CONTACT_REQUESTS
+                .open(this, getUsername()).as(JsonObject.class)
+				.expect(200, "While loading contact requests").get();
+
+		JsonArray inviteList = array.get("invite_list").asArray();
+		for (JsonValue jsonValue : inviteList) {
+			JsonObject inviteObject = jsonValue.asObject();
+
+			String sender = inviteObject.get("mri").asString();
+
+			Optional<JsonObject> lastInvite = inviteObject.get("invites").asArray().values().stream()
+					.map(JsonValue::asObject).max(Comparator.comparing(o -> o.get("time").asString()));
+
+			if (lastInvite.isPresent()) {
+				String time = lastInvite.get().get("time").asString();
+				String message = lastInvite.get().get("message").asString();
+				try {
+					Contact.ContactRequest request = new ContactRequestImpl(time, sender, message, this);
+					if (this.allContactRequests.add(request)) {
                         ContactRequestEvent event = new ContactRequestEvent(request);
                         getEventDispatcher().callEvent(event);
-                    }
-                }
-            } catch (java.text.ParseException e) {
-                getLogger().log(Level.WARNING, "Could not parse date for contact request", e);
-            }
-        }
+					}
+				} catch (ParseException e) {
+					getLogger().log(Level.WARNING, "Could not parse date for contact request", e);
+				}
+			}
+		}
         if (fromWebsocket) this.updateContactList();
     }
 

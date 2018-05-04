@@ -16,29 +16,24 @@
 
 package com.samczsun.skype4j.internal;
 
-import com.eclipsesource.json.JsonArray;
-import com.eclipsesource.json.JsonObject;
-import com.eclipsesource.json.JsonValue;
-import com.samczsun.skype4j.exceptions.ConnectionException;
-import com.samczsun.skype4j.internal.utils.Encoder;
-
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+
+import javax.imageio.ImageIO;
+
+import com.eclipsesource.json.JsonArray;
+import com.eclipsesource.json.JsonObject;
+import com.eclipsesource.json.JsonValue;
+import com.samczsun.skype4j.exceptions.ConnectionException;
+import com.samczsun.skype4j.internal.utils.Encoder;
 
 public class Endpoints {
     private static Map<Class<?>, Converter<?>> converters = new HashMap<>();
@@ -58,8 +53,12 @@ public class Endpoints {
 
     public static final Provider<String> AUTHORIZATION = skype -> "skype_token " + skype.getSkypeToken();
     public static final Provider<String> COOKIE = skype -> "skypetoken_asm=" + skype.getSkypeToken();
-    public static final Endpoints ACCEPT_CONTACT_REQUEST = new Endpoints(
-            "https://api.skype.com/users/self/contacts/auth-request/%s/accept").skypetoken();
+
+	public static final Endpoints ACCEPT_CONTACT_REQUEST = new Endpoints(
+			"https://contacts.skype.com/contacts/v2/users/%s/invites/%s/accept").skypetoken();
+	public static final Endpoints DECLINE_CONTACT_REQUEST = new Endpoints(
+			"https://contacts.skype.com/contacts/v2/users/%s/invites/%s/decline").skypetoken();
+
     public static final Endpoints GET_JOIN_URL = new Endpoints("https://api.scheduler.skype.com/threads").skypetoken();
     public static final Endpoints CHAT_INFO_URL = new Endpoints(
             "https://%sclient-s.gateway.messenger.live.com/v1/threads/%s/?view=msnp24Equivalent").cloud().regtoken();
@@ -82,8 +81,12 @@ public class Endpoints {
             "https://login.skype.com/logout?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com&intsrc=client-_-webapp-_-production-_-go-signin");
     public static final Endpoints ENDPOINTS_URL = new Endpoints(
             "https://client-s.gateway.messenger.live.com/v1/users/ME/endpoints");
+    @Deprecated
     public static final Endpoints AUTH_REQUESTS_URL = new Endpoints(
             "https://api.skype.com/users/self/contacts/auth-request").skypetoken();
+
+    public static final Endpoints GET_CONTACT_REQUESTS = new Endpoints(
+			"https://contacts.skype.com/contacts/v2/users/%s/invites").skypetoken();
     public static final Endpoints TROUTER_URL = new Endpoints("https://go.trouter.io/v2/a");
     public static final Endpoints POLICIES_URL = new Endpoints("https://prod.tpc.skype.com/v1/policies").skypetoken();
     public static final Endpoints REGISTRATIONS = new Endpoints(
@@ -136,16 +139,15 @@ public class Endpoints {
             "https://api.skype.com/users/self/contacts/%s/block").skypetoken();
     public static final Endpoints UNBLOCK_CONTACT = new Endpoints(
             "https://api.skype.com/users/self/contacts/%s/unblock").skypetoken();
-    public static final Endpoints AUTHORIZE_CONTACT = new Endpoints(
-            "https://api.skype.com/users/self/contacts/auth-request/%s/accept").skypetoken();
+	public static final Endpoints AUTHORIZE_CONTACT_SELF = new Endpoints(
+            "https://%sclient-s.gateway.messenger.live.com/v1/users/ME/contacts/%s").cloud().regtoken();
     public static final Endpoints UNAUTHORIZE_CONTACT = new Endpoints(
-            "https://client-s.gateway.messenger.live.com/v1/users/ME/contacts/8:%s").regtoken();
-    public static final Endpoints DECLINE_CONTACT_REQUEST = new Endpoints(
-            "https://api.skype.com/users/self/contacts/auth-request/%s/decline").skypetoken();
+			"https://contacts.skype.com/contacts/v2/users/%s/contacts/%s").skypetoken();
     public static final Endpoints UNAUTHORIZE_CONTACT_SELF = new Endpoints(
-            "https://api.skype.com/users/self/contacts/%s").skypetoken();
-    public static final Endpoints AUTHORIZATION_REQUEST = new Endpoints(
-            "https://api.skype.com/users/self/contacts/auth-request/%s").skypetoken();
+			"https://%sclient-s.gateway.messenger.live.com/v1/users/ME/contacts/%s").cloud().regtoken();
+
+    public static final Endpoints SEND_CONTACT_REQUEST = new Endpoints(
+            "https://contacts.skype.com/contacts/v2/users/%s/contacts").skypetoken();
     @Deprecated
     public static final Endpoints CONTACT_INFO = new Endpoints(
             "https://api.skype.com/users/self/contacts/profiles").skypetoken();

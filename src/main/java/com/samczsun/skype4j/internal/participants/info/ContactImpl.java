@@ -16,6 +16,14 @@
 
 package com.samczsun.skype4j.internal.participants.info;
 
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.UUID;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang3.StringUtils;
+import org.jsoup.helper.Validate;
+
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
 import com.samczsun.skype4j.Skype;
@@ -29,12 +37,6 @@ import com.samczsun.skype4j.internal.Utils;
 import com.samczsun.skype4j.internal.client.FullClient;
 import com.samczsun.skype4j.internal.utils.Encoder;
 import com.samczsun.skype4j.participants.info.Contact;
-import org.jsoup.helper.Validate;
-
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.util.UUID;
-import java.util.regex.Pattern;
 
 public class ContactImpl implements Contact {
     private static final Pattern PHONE_NUMBER = Pattern.compile("\\+[0-9]+");
@@ -193,36 +195,39 @@ public class ContactImpl implements Contact {
 
     @Override
     public void authorize() throws ConnectionException {
-        Endpoints.AUTHORIZE_CONTACT.open(skype, this.username).expect(200, "While authorizing contact").put();
+		Endpoints.AUTHORIZE_CONTACT_SELF.open(skype, StringUtils.prependIfMissing(this.username, "8:"))
+                .expect(200, "While authorizing contact").put();
         updateContactInfo();
     }
 
     @Override
     public void unauthorize() throws ConnectionException {
-        if (isAuthorized) {
-            Endpoints.UNAUTHORIZE_CONTACT_SELF
-                    .open(skype, this.username)
-                    .expect(200, "While unauthorizing contact")
-                    .put();
-        } else {
-            Endpoints.DECLINE_CONTACT_REQUEST
-                    .open(skype, this.username)
-                    .expect(201, "While unauthorizing contact")
-                    .put();
-        }
+
+		Endpoints.UNAUTHORIZE_CONTACT
+                .open(skype, skype.getUsername(), this.username)
+				.expect(200, "While anauthorizing contact")
+                .delete();
+		Endpoints.UNAUTHORIZE_CONTACT_SELF
+                .open(skype, this.username)
+                .expect(200, "While unauthorizing contact")
+				.delete();
         updateContactInfo();
     }
 
     @Override
     public void sendRequest(String message) throws ConnectionException, NoSuchContactException {
-        Endpoints.AUTHORIZATION_REQUEST
+		JsonObject requestObject = new JsonObject();
+		requestObject
+                .add("mri", "8:" + this.username)
+                .add("greeting", Encoder.encode(message));
+        Endpoints.SEND_CONTACT_REQUEST
                 .open(skype, this.username)
                 .on(404, (connection) -> {
                     throw new NoSuchContactException();
                 })
                 .expect(201, "While sending request")
                 .expect(200, "While sending request")
-                .put("greeting=" + Encoder.encode(message));
+				.put(requestObject);
         updateContactInfo();
     }
 
