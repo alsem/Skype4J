@@ -57,7 +57,6 @@ public abstract class ChatImpl implements Chat {
     private final String identity;
 
     private SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX");
-    private String backwardLink;
     private String syncState;
 
     private TypingThread typingThread;
@@ -171,20 +170,14 @@ public abstract class ChatImpl implements Chat {
     @Override
     public List<ChatMessage> loadMoreMessages(int amount) throws ConnectionException {
         JsonObject data;
-        if (backwardLink == null) {
-            if (syncState == null) {
+        if (syncState == null) {
                 data = Endpoints.LOAD_MESSAGES
                         .open(getClient(), getIdentity(), amount)
                         .as(JsonObject.class)
                         .expect(200, "While loading messages")
                         .get();
-            } else {
-                return Collections.emptyList();
-            }
         } else {
-            Matcher matcher = SkypeImpl.PAGE_SIZE_PATTERN.matcher(this.backwardLink);
-            //Matcher find appears to be doing nothing.
-            matcher.find();
+			Matcher matcher = SkypeImpl.PAGE_SIZE_PATTERN.matcher(this.syncState);
             String url = matcher.replaceAll("pageSize=" + amount);
             data =  Endpoints
                     .custom(url, getClient())
@@ -222,12 +215,9 @@ public abstract class ChatImpl implements Chat {
         }
 
         JsonObject metadata = data.get("_metadata").asObject();
-        if (metadata.get("backwardLink") != null) {
-            this.backwardLink = metadata.get("backwardLink").asString();
-        } else {
-            this.backwardLink = null;
+		if (metadata.get("syncState") != null) {
+            this.syncState = metadata.get("syncState").asString();
         }
-        this.syncState = metadata.get("syncState").asString();
         return messages;
     }
 
