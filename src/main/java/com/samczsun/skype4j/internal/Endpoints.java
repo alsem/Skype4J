@@ -20,6 +20,8 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -362,9 +364,18 @@ public class Endpoints {
                     }
                     this.url = new URL(surl);
                 }
-                connection = (HttpURLConnection) url.openConnection();
+                 String PROXY_HOST = System.getProperty("skype.conn.proxy.host", "");
+                 String PROXY_PORT = System.getProperty("skype.conn.proxy.port", "");
+                 Proxy proxy = Proxy.NO_PROXY;
+
+                 if (!PROXY_HOST.isEmpty() && !PROXY_PORT.isEmpty()){
+                     proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(PROXY_HOST,
+                             Integer.parseInt(PROXY_PORT)));
+                 }
+                connection = (HttpURLConnection) url.openConnection(proxy);
                 connection.setRequestMethod(method);
                 connection.setInstanceFollowRedirects(false);
+//                HttpsURLConnection.setDefaultHostnameVerifier((a,b) -> true);
                 for (Map.Entry<String, String> ent : headers.entrySet()) {
                     connection.setRequestProperty(ent.getKey(), ent.getValue());
                 }

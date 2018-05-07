@@ -1,21 +1,24 @@
 package com.samczsun.skype4j.internal.client;
 
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import org.apache.commons.lang3.StringEscapeUtils;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.jsoup.Connection;
-import org.jsoup.Jsoup;
-
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import org.apache.commons.lang3.StringEscapeUtils;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import com.eclipsesource.json.JsonObject;
+
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 /**
  * Класс для поддержки авторизации учетных записей microsoft, где в качестве имени пользователя - адрес email
@@ -118,22 +121,35 @@ public class LiveLoginHelper {
 		return tokens;
 	}
 
-	private static JSONObject getXTokenObjectFromAccess(String s) throws Exception {
-		Connection.Response response = Jsoup.connect(RPS)
-											.method(Connection.Method.POST)
-											.data("scopes", "client")
-											.data("clientVersion", "0/7.18.0.112//")
-											.data("access_token", s)
-											.data("partner", "999")
-											.data("site_name", "lw")
-											.ignoreContentType(true)
-											.execute();
+	private static JsonObject getXTokenObjectFromAccess(final String s, final OkHttpClient client) throws Exception {
 
-		return new JSONObject(response.body());
+		MediaType MEDIA_TYPE_JSON = MediaType.parse("application/json; charset=utf-8");
+
+		JsonObject jsonObj = new JsonObject();
+		jsonObj.add("scopes", "client");
+		jsonObj.add("clientVersion", "0/7.18.0.112//");
+		jsonObj.add("access_token", s);
+		jsonObj.add("partner", "999");
+		jsonObj.add("site_name", "lw");
+		Request request = new Request.Builder().url(RPS)
+				.post(RequestBody.create(MEDIA_TYPE_JSON, jsonObj.toString()))
+				.build();
+
+		Response response = client.newCall(request).execute();
+		return JsonObject.readFrom(response.body().string());
 	}
 
-	public static JSONObject getXTokenObject(String email, String password) throws Exception {
-		OkHttpClient client = new OkHttpClient();
+	public static JsonObject getXTokenObject(String email, String password) throws Exception {
+		Proxy proxy = Proxy.NO_PROXY;
+
+		String PROXY_HOST = System.getProperty("skype.conn.proxy.host", "");
+		String PROXY_PORT = System.getProperty("skype.conn.proxy.port", "");
+
+		if (!PROXY_HOST.isEmpty() && !PROXY_PORT.isEmpty()) {
+			proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(PROXY_HOST, Integer.parseInt(PROXY_PORT)));
+		}
+
+		OkHttpClient client = new OkHttpClient.Builder().proxy(proxy).build();
 		MediaType MEDIA_TYPE_MARKDOWN
 				= MediaType.parse("application/json; charset=utf-8");
 
@@ -160,7 +176,7 @@ public class LiveLoginHelper {
 		if (response.code() == 200) {
 			Map<String, String> parsedTokens = parsePayload(response.body().string());
 			if (parsedTokens.containsKey(SCOPE)) {
-				return getXTokenObjectFromAccess(parsedTokens.get(SCOPE));
+				return getXTokenObjectFromAccess(parsedTokens.get(SCOPE), client);
 			} else {
 				throw new Exception("Deprecated key");
 			}

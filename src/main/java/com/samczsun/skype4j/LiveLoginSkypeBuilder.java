@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 
-import org.json.JSONObject;
+import com.eclipsesource.json.JsonObject;
 
 import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
 import com.samczsun.skype4j.internal.client.FullClient;
@@ -134,14 +134,14 @@ public class LiveLoginSkypeBuilder {
 
 		} else if (username.contains("@")) {
 
-			JSONObject object;
+			JsonObject object;
 			try {
 				object = LiveLoginHelper.getXTokenObject(username, password);
-				String skypeToken = object.getString("skypetoken");
-				String skypeId = object.getString("skypeid");
+				String skypeToken = object.get("skypetoken").asString();
+				String skypeId = object.get("skypeid").asString();
 				return new MSFTSkypeClient(skypeToken, skypeId, resources, customLogger, errorHandlers);
 			} catch (Exception e) {
-				throw new IllegalArgumentException("Bad response");
+				throw new IllegalArgumentException("Bad response",e);
 			}
 		} else {
 			throw new IllegalArgumentException("No chat specified");
