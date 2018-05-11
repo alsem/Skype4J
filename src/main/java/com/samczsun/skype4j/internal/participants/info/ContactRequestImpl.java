@@ -61,8 +61,8 @@ public class ContactRequestImpl implements Contact.ContactRequest {
                 .open(skype, skype.getUsername(), sender)
                 .expect(200, "While accepting contact request")
                 .put();
-        Endpoints.AUTHORIZE_CONTACT_SELF.open(skype, StringUtils.prependIfMissing(sender, "8:"))
-                .expect(200, "While authorizing contact").put();
+//        Endpoints.AUTHORIZE_CONTACT_SELF.open(skype, StringUtils.prependIfMissing(sender, "8:"))
+//                .expect(200, "While authorizing contact").put();
     }
 
     @Override
