@@ -78,7 +78,6 @@ public abstract class SkypeImpl implements Skype {
     protected AuthenticationChecker reauthThread;
     protected PollThread pollThread;
     protected SkypeWebSocket wss;
-    protected String conversationBackwardLink;
     protected String conversationSyncState;
     protected Logger logger = Logger.getLogger(Skype.class.getCanonicalName());
     private String skypeToken;
@@ -155,20 +154,15 @@ public abstract class SkypeImpl implements Skype {
     public List<Chat> loadMoreChats(int amount) throws ConnectionException {
         try {
             JsonObject data;
-            if (this.conversationBackwardLink == null) {
-                if (this.conversationSyncState == null) {
-                    InputStream input = Endpoints.LOAD_CHATS
-                            .open(this, System.currentTimeMillis(), amount)
-                            .as(InputStream.class)
-                            .expect(200, "While loading chats")
-                            .get();
-                    data = Utils.parseJsonObject(input);
-                } else {
-                    return Collections.emptyList();
-                }
-            } else {
-                Matcher matcher = PAGE_SIZE_PATTERN.matcher(this.conversationBackwardLink);
-                matcher.find();
+			if (this.conversationSyncState == null) {
+				InputStream input = Endpoints.LOAD_CHATS
+                        .open(this, System.currentTimeMillis(), amount)
+						.as(InputStream.class)
+                        .expect(200, "While loading chats")
+                        .get();
+				data = Utils.parseJsonObject(input);
+			} else {
+                Matcher matcher = PAGE_SIZE_PATTERN.matcher(this.conversationSyncState);
                 String url = matcher.replaceAll("pageSize=" + amount);
                 data = Endpoints
                         .custom(url, this)
@@ -191,12 +185,9 @@ public abstract class SkypeImpl implements Skype {
             }
 
             JsonObject metadata = data.get("_metadata").asObject();
-            if (metadata.get("backwardLink") != null) {
-                this.conversationBackwardLink = metadata.get("backwardLink").asString();
-            } else {
-                this.conversationBackwardLink = null;
+            if (metadata.get("syncState") != null) {
+                this.conversationSyncState = metadata.get("syncState").asString();
             }
-            this.conversationSyncState = metadata.get("syncState").asString();
             return chats;
         } catch (IOException e) {
             throw ExceptionHandler.generateException("While loading chats", e);
