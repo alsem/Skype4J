@@ -24,12 +24,20 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 import javax.imageio.ImageIO;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
@@ -86,7 +94,8 @@ public class Endpoints {
     @Deprecated
     public static final Endpoints AUTH_REQUESTS_URL = new Endpoints(
             "https://api.skype.com/users/self/contacts/auth-request").skypetoken();
-
+    public static final Endpoints AUTHORIZE_CONTACT = new Endpoints(
+            "https://api.skype.com/users/self/contacts/auth-request/%s/accept").skypetoken();
     public static final Endpoints GET_CONTACT_REQUESTS = new Endpoints(
 			"https://contacts.skype.com/contacts/v2/users/%s/invites").skypetoken();
     public static final Endpoints TROUTER_URL = new Endpoints("https://go.trouter.io/v2/a");
@@ -344,7 +353,7 @@ public class Endpoints {
             for (Map.Entry<String, Provider<String>> provider : endpoint.providers.entrySet()) {
                 header(provider.getKey(), provider.getValue().provide(skype));
             }
-            HttpURLConnection connection = null;
+            HttpsURLConnection connection = null;
             try {
                 if (this.url == null) { //todo could fail if cloud is updated?
                     String surl = endpoint.url;
@@ -372,9 +381,12 @@ public class Endpoints {
                      proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(PROXY_HOST,
                              Integer.parseInt(PROXY_PORT)));
                  }
-                connection = (HttpURLConnection) url.openConnection(proxy);
+
+                connection = (HttpsURLConnection) url.openConnection(proxy);
                 connection.setRequestMethod(method);
                 connection.setInstanceFollowRedirects(false);
+                connection.setSSLSocketFactory(getUnsafeSslSocketFactory());
+                connection.setHostnameVerifier((hostName, session) -> true);
 //                HttpsURLConnection.setDefaultHostnameVerifier((a,b) -> true);
                 for (Map.Entry<String, String> ent : headers.entrySet()) {
                     connection.setRequestProperty(ent.getKey(), ent.getValue());
@@ -417,6 +429,36 @@ public class Endpoints {
                 }
             }
         }
+
+		private SSLSocketFactory getUnsafeSslSocketFactory() {
+			try {
+				// Create a trust manager that does not validate certificate chains
+				final TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+					@Override
+					public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType)
+							throws CertificateException {
+					}
+
+					@Override
+					public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType)
+							throws CertificateException {
+					}
+
+					@Override
+					public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+						return null;
+					}
+				} };
+
+				// Install the all-trusting trust manager
+				final SSLContext sslContext = SSLContext.getInstance("SSL");
+				sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+				// Create an ssl socket factory with our all-trusting manager
+				return sslContext.getSocketFactory();
+			} catch (NoSuchAlgorithmException | KeyManagementException e) {
+				throw new RuntimeException(e);
+			}
+		}
 
         private String serializeCookies(Map<String, String> cookies) {
             StringBuilder result = new StringBuilder();

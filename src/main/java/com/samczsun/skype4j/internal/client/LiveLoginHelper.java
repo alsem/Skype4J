@@ -2,11 +2,18 @@ package com.samczsun.skype4j.internal.client;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.json.JSONArray;
@@ -148,8 +155,7 @@ public class LiveLoginHelper {
 		if (!PROXY_HOST.isEmpty() && !PROXY_PORT.isEmpty()) {
 			proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(PROXY_HOST, Integer.parseInt(PROXY_PORT)));
 		}
-
-		OkHttpClient client = new OkHttpClient.Builder().proxy(proxy).build();
+		OkHttpClient client = getUnsafeOkHttpClient(proxy);
 		MediaType MEDIA_TYPE_MARKDOWN
 				= MediaType.parse("application/json; charset=utf-8");
 
@@ -210,4 +216,39 @@ public class LiveLoginHelper {
 
 	}
 
+	private static OkHttpClient getUnsafeOkHttpClient(Proxy proxy) {
+		try {
+			// Create a trust manager that does not validate certificate chains
+			final TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+				@Override
+				public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType)
+						throws CertificateException {
+				}
+
+				@Override
+				public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType)
+						throws CertificateException {
+				}
+
+				@Override
+				public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+					return new X509Certificate[]{};
+				}
+			} };
+
+			// Install the all-trusting trust manager
+			final SSLContext sslContext = SSLContext.getInstance("SSL");
+			sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+			// Create an ssl socket factory with our all-trusting manager
+			final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+
+			OkHttpClient okHttpClient = new OkHttpClient().newBuilder()
+					.sslSocketFactory(sslSocketFactory, (X509TrustManager) trustAllCerts[0])
+					.hostnameVerifier((hostname, session) -> true)
+					.proxy(proxy).build();
+			return okHttpClient;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
 }
