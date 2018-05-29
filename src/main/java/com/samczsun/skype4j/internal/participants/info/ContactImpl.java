@@ -196,7 +196,7 @@ public class ContactImpl implements Contact {
     @Override
     public void authorize() throws ConnectionException {
 		Endpoints.AUTHORIZE_CONTACT_SELF.open(skype, StringUtils.prependIfMissing(this.username, "8:"))
-                .expect(200, "While authorizing contact").put();
+                .expect(200, "While adding to contact list").put();
         updateContactInfo();
     }
 
@@ -221,7 +221,7 @@ public class ContactImpl implements Contact {
                 .add("mri", "8:" + this.username)
                 .add("greeting", Encoder.encode(message));
         Endpoints.SEND_CONTACT_REQUEST
-                .open(skype, this.username)
+                .open(skype, skype.getUsername())
                 .on(404, (connection) -> {
                     throw new NoSuchContactException();
                 })

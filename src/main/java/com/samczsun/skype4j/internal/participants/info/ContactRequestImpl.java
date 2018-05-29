@@ -16,16 +16,15 @@
 
 package com.samczsun.skype4j.internal.participants.info;
 
-import java.text.ParseException;
-import java.time.Instant;
-import java.util.Date;
-
-import org.apache.commons.lang3.StringUtils;
-
 import com.samczsun.skype4j.exceptions.ConnectionException;
 import com.samczsun.skype4j.internal.Endpoints;
 import com.samczsun.skype4j.internal.client.FullClient;
 import com.samczsun.skype4j.participants.info.Contact;
+import org.apache.commons.lang3.StringUtils;
+
+import java.text.ParseException;
+import java.time.Instant;
+import java.util.Date;
 
 public class ContactRequestImpl implements Contact.ContactRequest {
 
@@ -62,13 +61,7 @@ public class ContactRequestImpl implements Contact.ContactRequest {
                 .open(skype, skype.getUsername(), sender)
                 .expect(200, "While accepting contact request")
                 .put();
-
-        Endpoints.AUTHORIZE_CONTACT
-                .open(skype, sender)
-                .expect(200, "While accepting auth-request")
-                .put();
-//        Endpoints.AUTHORIZE_CONTACT_SELF.open(skype, StringUtils.prependIfMissing(sender, "8:"))
-//                .expect(200, "While authorizing contact").put();
+        getSender().authorize();
     }
 
     @Override

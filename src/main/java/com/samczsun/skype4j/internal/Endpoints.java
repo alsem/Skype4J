@@ -94,6 +94,7 @@ public class Endpoints {
     @Deprecated
     public static final Endpoints AUTH_REQUESTS_URL = new Endpoints(
             "https://api.skype.com/users/self/contacts/auth-request").skypetoken();
+    @Deprecated
     public static final Endpoints AUTHORIZE_CONTACT = new Endpoints(
             "https://api.skype.com/users/self/contacts/auth-request/%s/accept").skypetoken();
     public static final Endpoints GET_CONTACT_REQUESTS = new Endpoints(
@@ -151,7 +152,7 @@ public class Endpoints {
     public static final Endpoints UNBLOCK_CONTACT = new Endpoints(
             "https://api.skype.com/users/self/contacts/%s/unblock").skypetoken();
 	public static final Endpoints AUTHORIZE_CONTACT_SELF = new Endpoints(
-            "https://%sclient-s.gateway.messenger.live.com/v1/users/ME/contacts/%s").cloud().regtoken();
+            "https://client-s.gateway.messenger.live.com/v1/users/ME/contacts/%s").regtoken();
     public static final Endpoints UNAUTHORIZE_CONTACT = new Endpoints(
 			"https://contacts.skype.com/contacts/v2/users/%s/contacts/%s").skypetoken();
     public static final Endpoints UNAUTHORIZE_CONTACT_SELF = new Endpoints(
