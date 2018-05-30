@@ -45,12 +45,12 @@ public class MSFTSkypeClient extends FullClient {
 
 		tasks.add(() -> Endpoints.ELIGIBILITY_CHECK.open(this, new Object[0])
 				.expect(200, "You are not eligible to use Skype for Web!").get());
+		this.loggedIn.set(true);
 		try {
 			ExecutorService executorService = Executors.newFixedThreadPool(4);
 			tasks.forEach(executorService::submit);
 			executorService.shutdown();
 			executorService.awaitTermination(1, TimeUnit.DAYS);
-			this.loggedIn.set(true);
 
 			if (this.serverPingThread != null) {
 				this.serverPingThread.kill();
