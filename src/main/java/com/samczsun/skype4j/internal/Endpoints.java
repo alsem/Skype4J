@@ -83,12 +83,13 @@ public class Endpoints {
     public static final Endpoints CONVERSATION_PROPERTY_GLOBAL = new Endpoints(
             "https://%sclient-s.gateway.messenger.live.com/v1/threads/%s/properties?name=%s").cloud().regtoken();
     public static final Endpoints ADD_MEMBER_URL = new Endpoints(
-            "https://client-s.gateway.messenger.live.com/v1/threads/%s/members/8:%s").regtoken();
+            "https://%sclient-s.gateway.messenger.live.com/v1/threads/%s/members/8:%s").cloud().regtoken();
     public static final Endpoints LOGIN_URL = new Endpoints("https://api.skype.com/login/skypetoken");
     public static final Endpoints PING_URL = new Endpoints("https://web.skype.com/api/v1/session-ping").skypetoken();
     public static final Endpoints TOKEN_AUTH_URL = new Endpoints("https://api.asm.skype.com/v1/skypetokenauth");
     public static final Endpoints LOGOUT_URL = new Endpoints(
             "https://login.skype.com/logout?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com&intsrc=client-_-webapp-_-production-_-go-signin");
+    //called without regtoken or cloud
     public static final Endpoints ENDPOINTS_URL = new Endpoints(
             "https://client-s.gateway.messenger.live.com/v1/users/ME/endpoints");
     @Deprecated
@@ -123,10 +124,12 @@ public class Endpoints {
     public static final Endpoints ACTIVE = new Endpoints(
             "https://%sclient-s.gateway.messenger.live.com/v1/users/ME/endpoints/%s/active").cloud().regtoken();
     public static final Endpoints LOAD_CHATS = new Endpoints(
-            "https://client-s.gateway.messenger.live.com/v1/users/ME/conversations?startTime=%s&pageSize=%s&view=msnp24Equivalent&targetType=Passport|Skype|Lync|Thread|PSTN|Agent")
+            "https://%sclient-s.gateway.messenger.live.com/v1/users/ME/conversations?startTime=%s&pageSize=%s&view=msnp24Equivalent&targetType=Passport|Skype|Lync|Thread|PSTN|Agent")
+            .cloud()
             .regtoken();
     public static final Endpoints LOAD_MESSAGES = new Endpoints(
-            "https://client-s.gateway.messenger.live.com/v1/users/ME/conversations/%s/messages?startTime=0&pageSize=%s&view=msnp24Equivalent|supportsMessageProperties&targetType=Passport|Skype|Lync|Thread")
+            "https://%sclient-s.gateway.messenger.live.com/v1/users/ME/conversations/%s/messages?startTime=0&pageSize=%s&view=msnp24Equivalent|supportsMessageProperties&targetType=Passport|Skype|Lync|Thread")
+            .cloud()
             .regtoken();
     public static final Endpoints OBJECTS = new Endpoints("https://api.asm.skype.com/v1/objects").defaultHeader(
             "Authorization", AUTHORIZATION);
@@ -152,7 +155,7 @@ public class Endpoints {
     public static final Endpoints UNBLOCK_CONTACT = new Endpoints(
             "https://api.skype.com/users/self/contacts/%s/unblock").skypetoken();
 	public static final Endpoints AUTHORIZE_CONTACT_SELF = new Endpoints(
-            "https://client-s.gateway.messenger.live.com/v1/users/ME/contacts/%s").regtoken();
+            "https://%sclient-s.gateway.messenger.live.com/v1/users/ME/contacts/%s").cloud().regtoken();
     public static final Endpoints UNAUTHORIZE_CONTACT = new Endpoints(
 			"https://contacts.skype.com/contacts/v2/users/%s/contacts/%s").skypetoken();
     public static final Endpoints UNAUTHORIZE_CONTACT_SELF = new Endpoints(

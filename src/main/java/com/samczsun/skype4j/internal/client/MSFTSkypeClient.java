@@ -32,26 +32,18 @@ public class MSFTSkypeClient extends FullClient {
 	public void login() throws ConnectionException {
 		List<UncheckedRunnable> tasks = new ArrayList<>();
 
-		tasks.add(this::registerEndpoint);
 		tasks.add(this::loadAllContacts);
 		tasks.add(() -> this.getContactRequests(false));
-//		tasks.add(() -> {
-//			try {
-//				this.registerWebSocket();
-//			} catch (Exception e) {
-//				handleError(ErrorSource.REGISTERING_WEBSOCKET, e, false);
-//			}
-//		});
-
+		tasks.add(this::registerEndpoint);
 		tasks.add(() -> Endpoints.ELIGIBILITY_CHECK.open(this, new Object[0])
 				.expect(200, "You are not eligible to use Skype for Web!").get());
-		this.loggedIn.set(true);
 		try {
 			ExecutorService executorService = Executors.newFixedThreadPool(4);
 			tasks.forEach(executorService::submit);
 			executorService.shutdown();
 			executorService.awaitTermination(1, TimeUnit.DAYS);
 
+			this.loggedIn.set(true);
 			if (this.serverPingThread != null) {
 				this.serverPingThread.kill();
 				this.serverPingThread = null;
