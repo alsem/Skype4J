@@ -32,7 +32,7 @@ import java.util.logging.Logger;
  * This class represents a single Skype account, which may or may not have been logged in
  */
 public interface Skype {
-    String VERSION = "908/1.52.0.82//skype.com";
+    String VERSION = "908/1.117.0.21//skype.com";
 
     RuntimeException UNEXPECTED = new RuntimeException("Please open a GitHub issue with this stacktrace, something unexpected happened");
 

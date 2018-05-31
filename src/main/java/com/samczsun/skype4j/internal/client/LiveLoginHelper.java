@@ -151,11 +151,12 @@ public class LiveLoginHelper {
 
 		String PROXY_HOST = System.getProperty("skype.conn.proxy.host", "");
 		String PROXY_PORT = System.getProperty("skype.conn.proxy.port", "");
+		boolean sslEnabled = !Boolean.parseBoolean(System.getProperty("skype.conn.proxy.ssl.disabled"));
 
 		if (!PROXY_HOST.isEmpty() && !PROXY_PORT.isEmpty()) {
 			proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(PROXY_HOST, Integer.parseInt(PROXY_PORT)));
 		}
-		OkHttpClient client = getUnsafeOkHttpClient(proxy);
+		OkHttpClient client = getOkHttpClient(proxy, sslEnabled);
 		MediaType MEDIA_TYPE_MARKDOWN
 				= MediaType.parse("application/json; charset=utf-8");
 
@@ -216,7 +217,7 @@ public class LiveLoginHelper {
 
 	}
 
-	private static OkHttpClient getUnsafeOkHttpClient(Proxy proxy) {
+	private static OkHttpClient getOkHttpClient(Proxy proxy, boolean sslEnabled) {
 		try {
 			// Create a trust manager that does not validate certificate chains
 			final TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
@@ -242,11 +243,12 @@ public class LiveLoginHelper {
 			// Create an ssl socket factory with our all-trusting manager
 			final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
-			OkHttpClient okHttpClient = new OkHttpClient().newBuilder()
-					.sslSocketFactory(sslSocketFactory, (X509TrustManager) trustAllCerts[0])
-					.hostnameVerifier((hostname, session) -> true)
-					.proxy(proxy).build();
-			return okHttpClient;
+			OkHttpClient.Builder builder = new OkHttpClient.Builder().proxy(proxy);
+			if (sslEnabled) {
+				builder.sslSocketFactory(sslSocketFactory, (X509TrustManager) trustAllCerts[0]);
+				builder.hostnameVerifier((hostname, session) -> true);
+			}
+			return builder.build();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}

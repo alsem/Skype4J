@@ -379,6 +379,7 @@ public class Endpoints {
                 }
                  String PROXY_HOST = System.getProperty("skype.conn.proxy.host", "");
                  String PROXY_PORT = System.getProperty("skype.conn.proxy.port", "");
+                 Boolean sslEnabled = !Boolean.parseBoolean(System.getProperty("skype.conn.proxy.ssl.disabled"));
                  Proxy proxy = Proxy.NO_PROXY;
 
                  if (!PROXY_HOST.isEmpty() && !PROXY_PORT.isEmpty()){
@@ -389,8 +390,10 @@ public class Endpoints {
                 connection = (HttpsURLConnection) url.openConnection(proxy);
                 connection.setRequestMethod(method);
                 connection.setInstanceFollowRedirects(false);
-                connection.setSSLSocketFactory(getUnsafeSslSocketFactory());
-                connection.setHostnameVerifier((hostName, session) -> true);
+                if (sslEnabled){
+                    connection.setSSLSocketFactory(getUnsafeSslSocketFactory());
+                    connection.setHostnameVerifier((hostName, session) -> true);
+                }
 //                HttpsURLConnection.setDefaultHostnameVerifier((a,b) -> true);
                 for (Map.Entry<String, String> ent : headers.entrySet()) {
                     connection.setRequestProperty(ent.getKey(), ent.getValue());
