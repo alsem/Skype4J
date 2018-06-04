@@ -33,8 +33,8 @@ public class MSFTSkypeClient extends FullClient {
 		List<UncheckedRunnable> tasks = new ArrayList<>();
 
 		tasks.add(this::loadAllContacts);
-		tasks.add(() -> this.getContactRequests(false));
-		tasks.add(this::registerEndpoint);
+//		tasks.add(() -> this.getContactRequests(false));
+		tasks.add(this::registerEndpointLocationFirst);
 		tasks.add(() -> Endpoints.ELIGIBILITY_CHECK.open(this, new Object[0])
 				.expect(200, "You are not eligible to use Skype for Web!").get());
 		try {

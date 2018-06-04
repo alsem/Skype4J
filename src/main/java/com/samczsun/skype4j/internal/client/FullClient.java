@@ -16,6 +16,26 @@
 
 package com.samczsun.skype4j.internal.client;
 
+import com.eclipsesource.json.JsonArray;
+import com.eclipsesource.json.JsonObject;
+import com.eclipsesource.json.JsonValue;
+import com.samczsun.skype4j.chat.GroupChat;
+import com.samczsun.skype4j.events.contact.ContactRequestEvent;
+import com.samczsun.skype4j.exceptions.ChatNotFoundException;
+import com.samczsun.skype4j.exceptions.ConnectionException;
+import com.samczsun.skype4j.exceptions.InvalidCredentialsException;
+import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
+import com.samczsun.skype4j.exceptions.handler.ErrorSource;
+import com.samczsun.skype4j.internal.Endpoints;
+import com.samczsun.skype4j.internal.ExceptionHandler;
+import com.samczsun.skype4j.internal.SkypeImpl;
+import com.samczsun.skype4j.internal.participants.info.ContactImpl;
+import com.samczsun.skype4j.internal.participants.info.ContactRequestImpl;
+import com.samczsun.skype4j.internal.utils.Encoder;
+import com.samczsun.skype4j.internal.utils.UncheckedRunnable;
+import com.samczsun.skype4j.participants.info.Contact;
+
+import javax.xml.bind.DatatypeConverter;
 import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -35,27 +55,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import javax.xml.bind.DatatypeConverter;
-
-import com.eclipsesource.json.JsonArray;
-import com.eclipsesource.json.JsonObject;
-import com.eclipsesource.json.JsonValue;
-import com.samczsun.skype4j.chat.GroupChat;
-import com.samczsun.skype4j.events.contact.ContactRequestEvent;
-import com.samczsun.skype4j.exceptions.ChatNotFoundException;
-import com.samczsun.skype4j.exceptions.ConnectionException;
-import com.samczsun.skype4j.exceptions.InvalidCredentialsException;
-import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
-import com.samczsun.skype4j.exceptions.handler.ErrorSource;
-import com.samczsun.skype4j.internal.Endpoints;
-import com.samczsun.skype4j.internal.ExceptionHandler;
-import com.samczsun.skype4j.internal.SkypeImpl;
-import com.samczsun.skype4j.internal.participants.info.ContactImpl;
-import com.samczsun.skype4j.internal.participants.info.ContactRequestImpl;
-import com.samczsun.skype4j.internal.utils.Encoder;
-import com.samczsun.skype4j.internal.utils.UncheckedRunnable;
-import com.samczsun.skype4j.participants.info.Contact;
 
 public class FullClient extends SkypeImpl {
     private static final Pattern URL_PATTERN = Pattern.compile("threads/(.*)", Pattern.CASE_INSENSITIVE);
@@ -139,8 +138,8 @@ public class FullClient extends SkypeImpl {
     }
 
     @Override
-    public void getContactRequests(boolean fromWebsocket) throws ConnectionException {
-		JsonObject array = Endpoints.GET_CONTACT_REQUESTS
+    public void getContactRequests(boolean isRegisteredEndpoint) throws ConnectionException {
+        JsonObject array = Endpoints.GET_CONTACT_REQUESTS
                 .open(this, getUsername()).as(JsonObject.class)
 				.expect(200, "While loading contact requests").get();
 
@@ -158,16 +157,18 @@ public class FullClient extends SkypeImpl {
 				String message = lastInvite.get().get("message").asString();
 				try {
 					Contact.ContactRequest request = new ContactRequestImpl(time, sender, message, this);
-					if (this.allContactRequests.add(request)) {
-                        ContactRequestEvent event = new ContactRequestEvent(request);
-                        getEventDispatcher().callEvent(event);
-					}
-				} catch (ParseException e) {
+                    if (isRegisteredEndpoint) {
+                        if (this.allContactRequests.add(request)) {
+                            ContactRequestEvent event = new ContactRequestEvent(request);
+                            getEventDispatcher().callEvent(event);
+                        }
+                    }
+                } catch (ParseException e) {
 					getLogger().log(Level.WARNING, "Could not parse date for contact request", e);
 				}
 			}
 		}
-        if (fromWebsocket) this.updateContactList();
+		if (isRegisteredEndpoint) updateContactList();
     }
 
     @Override

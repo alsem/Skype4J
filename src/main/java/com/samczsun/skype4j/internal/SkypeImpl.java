@@ -24,7 +24,11 @@ import com.samczsun.skype4j.Visibility;
 import com.samczsun.skype4j.chat.Chat;
 import com.samczsun.skype4j.chat.GroupChat;
 import com.samczsun.skype4j.events.EventDispatcher;
-import com.samczsun.skype4j.exceptions.*;
+import com.samczsun.skype4j.exceptions.ChatNotFoundException;
+import com.samczsun.skype4j.exceptions.ConnectionException;
+import com.samczsun.skype4j.exceptions.InvalidCredentialsException;
+import com.samczsun.skype4j.exceptions.NoPermissionException;
+import com.samczsun.skype4j.exceptions.NotParticipatingException;
 import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
 import com.samczsun.skype4j.exceptions.handler.ErrorSource;
 import com.samczsun.skype4j.internal.chat.ChatImpl;
@@ -39,7 +43,11 @@ import com.samczsun.skype4j.participants.info.BotInfo;
 import com.samczsun.skype4j.participants.info.Contact;
 import org.jsoup.helper.Validate;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -47,12 +55,25 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.*;
+import java.util.logging.ConsoleHandler;
 import java.util.logging.Formatter;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -357,6 +378,59 @@ public abstract class SkypeImpl implements Skype {
                 .header("Authentication", "skypetoken=" + skypeToken)
                 .post(new JsonObject().add("endpointFeatures", "Agent"));
     }
+
+    protected void registerEndpointLocationFirst() throws ConnectionException {
+
+        String messageHost = "https://client-s.gateway.messenger.live.com/v1";
+        //return token, expiry, msgsHost, endpoint
+        while (this.endpointId == null) {
+
+            HttpURLConnection post = Endpoints.custom(
+                    messageHost + "/users/ME/endpoints", this)
+                    .expect(code -> code == 200 || code == 201 || code == 404, "While registering endpoint")
+                    .header("LockAndKey", Utils.generateChallengeHeader())
+                    .header("Authentication", "skypetoken=" + skypeToken)
+                    .header("BehaviorOverride", "redirectAs404")
+
+                    .on(200, (connection) -> {
+                        if (endpointId == null) {
+                            JsonArray convert = Endpoints.convert(JsonArray.class, this, connection);
+                            endpointId = convert.get(0).asObject().get("id").asString();
+                        }
+                        return connection;
+                    })
+                    .post(new JsonObject().add("endpointFeatures", "Agent"));
+            String regTokenHead = post.getHeaderField("Set-RegistrationToken");
+            String locationHead = post.getHeaderField("Location");
+            if (locationHead != null) {
+                Matcher m = Pattern.compile("(https://[^/]+/v1)/users/ME/endpoints/%7B([a-z0-9\\-]+)%7D")
+                        .matcher(locationHead);
+                if (m.find()) {
+                    if (m.group(2) != null) {
+                        this.endpointId = "{" + m.group(2) + "}";
+                    }
+
+                    if (!m.group(0).equals(messageHost)) {
+                        // Skype is requiring the use of a different hostname.
+                        messageHost = m.group(1);
+                        //update cloud prefix to use in queries
+                        updateCloud(locationHead);
+                        //Don't accept the token if present, we need to re-register first.
+                        continue;
+                    }
+                }
+            }
+            if (regTokenHead != null) {
+                String[] splits = regTokenHead.split(";");
+                this.registrationToken = splits[0];
+                this.registrationTokenExpiryTime = Long.parseLong(splits[1].substring("expires=".length() + 1)) * 1000;
+                if (splits.length > 2) {
+                    this.endpointId = splits[2].split("=")[1];
+                }
+            }
+        }
+    }
+
 
     public abstract void getContactRequests(boolean fromWebsocket) throws ConnectionException;
 

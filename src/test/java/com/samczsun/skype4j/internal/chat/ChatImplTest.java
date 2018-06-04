@@ -30,7 +30,6 @@ public class ChatImplTest {
 		skype.logout();
 	}
 
-	@Ignore
 	@Test
 	public void loadMoreMessages() throws Exception {
 		Chat chat = skype.getOrLoadChat("8:alexey.semennikov");
