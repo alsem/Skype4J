@@ -383,7 +383,7 @@ public abstract class SkypeImpl implements Skype {
 
         String messageHost = "https://client-s.gateway.messenger.live.com/v1";
         //return token, expiry, msgsHost, endpoint
-        while (this.endpointId == null) {
+        while (this.registrationToken == null) {
 
             HttpURLConnection post = Endpoints.custom(
                     messageHost + "/users/ME/endpoints", this)
@@ -405,7 +405,7 @@ public abstract class SkypeImpl implements Skype {
             if (locationHead != null) {
                 Matcher m = Pattern.compile("(https://[^/]+/v1)/users/ME/endpoints/%7B([a-z0-9\\-]+)%7D")
                         .matcher(locationHead);
-                if (m.find()) {
+                if (m.matches()) {
                     if (m.group(2) != null) {
                         this.endpointId = "{" + m.group(2) + "}";
                     }
