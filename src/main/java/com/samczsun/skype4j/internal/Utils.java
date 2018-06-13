@@ -31,7 +31,6 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -78,7 +77,7 @@ public class Utils {
                 .expect(201, "While uploading data")
                 .connect("PUT", data);
 
-        Endpoints.EndpointConnection<JsonObject> econn = Endpoints.IMG_STATUS
+        EndpointConnection<JsonObject> econn = Endpoints.IMG_STATUS
                 .open(chat.getClient(), id, type.id)
                 .as(JsonObject.class)
                 .expect(200, "While getting upload status");

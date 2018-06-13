@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
  * Thrown when an exception occurs while connecting to an endpoint
  */
 public class ConnectionException extends SkypeException {
+    private static final long serialVersionUID = 6479923597926811460L;
     private int responseCode;
     private String responseMessage;
     private String message;

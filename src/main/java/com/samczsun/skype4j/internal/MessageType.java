@@ -301,7 +301,7 @@ public enum MessageType {
                         .cookies(skype.getCookies())
                         .expect(200, "While getting URI object")
                         .get();
-                Endpoints.EndpointConnection<JsonObject> econn = Endpoints
+                EndpointConnection<JsonObject> econn = Endpoints
                         .custom(obj.get("status_location").asString(), skype)
                         .as(JsonObject.class)
                         .expect(200, "While getting URI object")

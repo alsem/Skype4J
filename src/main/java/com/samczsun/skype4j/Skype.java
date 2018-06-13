@@ -49,7 +49,8 @@ public interface Skype {
      * @throws ConnectionException         If a network error occured while connecting
      * @throws NotParticipatingException   If the guest account cannot log in due to the chat not being open
      */
-    void login() throws InvalidCredentialsException, ConnectionException, NotParticipatingException;
+    void login() throws InvalidCredentialsException, ConnectionException, NotParticipatingException,
+			SkypeAuthenticationException;
 
     /**
      * Subscribe to the HTTP long polling service.

@@ -16,20 +16,17 @@
 
 package com.samczsun.skype4j;
 
+import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
+import com.samczsun.skype4j.internal.client.FullClient;
+import com.samczsun.skype4j.internal.client.GuestClient;
+import com.samczsun.skype4j.internal.client.MSFTSkypeClient;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
-
-import com.eclipsesource.json.JsonObject;
-
-import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
-import com.samczsun.skype4j.internal.client.FullClient;
-import com.samczsun.skype4j.internal.client.GuestClient;
-import com.samczsun.skype4j.internal.client.LiveLoginHelper;
-import com.samczsun.skype4j.internal.client.MSFTSkypeClient;
 
 /**
  * This class is used to construct a new {@link Skype} instance.
@@ -71,7 +68,6 @@ public class LiveLoginSkypeBuilder {
 	 * Subscribe to a resource which has not been added into the API
 	 *
 	 * @param resource The resource to subscribe to
-	 *
 	 * @return The same SkypeBuilder
 	 */
 	public LiveLoginSkypeBuilder withResource(String resource) {
@@ -83,7 +79,6 @@ public class LiveLoginSkypeBuilder {
 	 * Use a custom logger for this Skype instance
 	 *
 	 * @param logger The custom logger to use
-	 *
 	 * @return The same SkypeBuilder
 	 */
 	public LiveLoginSkypeBuilder withLogger(Logger logger) {
@@ -106,12 +101,13 @@ public class LiveLoginSkypeBuilder {
 	 * Join a particular chat as a guest. Will have no effect if a password is specified
 	 *
 	 * @param id The chat id
-	 *
 	 * @return The same SkypeBuilder
 	 */
-    public LiveLoginSkypeBuilder withChat(String id) {
-        if (!id.startsWith("19:")) throw new IllegalArgumentException("Invalid chat id");
-        if (password != null) throw new IllegalArgumentException("Not guest account");
+	public LiveLoginSkypeBuilder withChat(String id) {
+		if (!id.startsWith("19:"))
+			throw new IllegalArgumentException("Invalid chat id");
+		if (password != null)
+			throw new IllegalArgumentException("Not guest account");
 		this.chatId = id;
 		return this;
 	}
@@ -133,16 +129,7 @@ public class LiveLoginSkypeBuilder {
 			return new GuestClient(username, chatId, resources, customLogger, errorHandlers);
 
 		} else if (username.contains("@")) {
-
-			JsonObject object;
-			try {
-				object = LiveLoginHelper.getXTokenObject(username, password);
-				String skypeToken = object.get("skypetoken").asString();
-				String skypeId = object.get("skypeid").asString();
-				return new MSFTSkypeClient(skypeToken, skypeId, resources, customLogger, errorHandlers);
-			} catch (Exception e) {
-				throw new IllegalArgumentException("Bad response",e);
-			}
+			return new MSFTSkypeClient(username, password, resources, customLogger, errorHandlers);
 		} else {
 			throw new IllegalArgumentException("No chat specified");
 		}

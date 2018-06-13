@@ -29,9 +29,12 @@ import com.samczsun.skype4j.exceptions.ConnectionException;
 import com.samczsun.skype4j.exceptions.InvalidCredentialsException;
 import com.samczsun.skype4j.exceptions.NoPermissionException;
 import com.samczsun.skype4j.exceptions.NotParticipatingException;
+import com.samczsun.skype4j.exceptions.SkypeAuthenticationException;
 import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
 import com.samczsun.skype4j.exceptions.handler.ErrorSource;
 import com.samczsun.skype4j.internal.chat.ChatImpl;
+import com.samczsun.skype4j.internal.client.auth.SkypeAuthProvider;
+import com.samczsun.skype4j.internal.client.auth.SkypeRegistrationProvider;
 import com.samczsun.skype4j.internal.participants.info.BotInfoImpl;
 import com.samczsun.skype4j.internal.participants.info.ContactImpl;
 import com.samczsun.skype4j.internal.threads.ActiveThread;
@@ -55,6 +58,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
@@ -89,7 +93,6 @@ public abstract class SkypeImpl implements Skype {
     protected final UUID guid = UUID.randomUUID();
     protected final Set<String> resources;
     protected final List<ErrorHandler> errorHandlers;
-    private final String username;
     protected ExecutorService scheduler;
     protected ExecutorService shutdownThread;
     protected EventDispatcher eventDispatcher = new SkypeEventDispatcher(this);
@@ -101,7 +104,6 @@ public abstract class SkypeImpl implements Skype {
     protected SkypeWebSocket wss;
     protected String conversationSyncState;
     protected Logger logger = Logger.getLogger(Skype.class.getCanonicalName());
-    private String skypeToken;
     private long skypeTokenExpiryTime;
     private String registrationToken;
     private long registrationTokenExpiryTime;
@@ -116,8 +118,11 @@ public abstract class SkypeImpl implements Skype {
     protected final Map<String, BotInfoImpl> allBots = Collections.synchronizedMap(new HashMap<>());
     protected final Set<Contact.ContactRequest> allContactRequests = Collections.synchronizedSet(new HashSet<>());
 
-    public SkypeImpl(String username, Set<String> resources, Logger logger, List<ErrorHandler> errorHandlers) {
-        this.username = username;
+    private final SkypeRegistrationProvider regtokenProvider;
+
+    public SkypeImpl(Set<String> resources, Logger logger, List<ErrorHandler> errorHandlers) {
+
+        this.regtokenProvider = new SkypeRegistrationProvider();
         this.resources = Collections.unmodifiableSet(new HashSet<>(resources));
         this.errorHandlers = Collections.unmodifiableList(new ArrayList<>(errorHandlers));
         if (logger != null) {
@@ -147,8 +152,14 @@ public abstract class SkypeImpl implements Skype {
         }
     }
 
+    protected abstract SkypeAuthProvider getAuthProvider();
+
+    protected SkypeRegistrationProvider getRegtokenProvider(){
+        return regtokenProvider;
+    }
+
     @Override
-    public void login() throws ConnectionException, InvalidCredentialsException {
+    public void login() throws ConnectionException, InvalidCredentialsException, SkypeAuthenticationException {
         Endpoints.ELIGIBILITY_CHECK.open(this)
                 .expect(200, "You are not eligible to use Skype for Web!")
                 .get();
@@ -281,7 +292,7 @@ public abstract class SkypeImpl implements Skype {
 
     }
 
-    protected void updateCloud(String anyLocation) {
+    public void updateCloud(String anyLocation) {
         Pattern grabber = Pattern.compile("https?://([^-]*-)client-s");
         Matcher m = grabber.matcher(anyLocation);
         if (m.find()) {
@@ -371,11 +382,11 @@ public abstract class SkypeImpl implements Skype {
                 .on(301, (connection) -> Endpoints
                         .custom(Endpoints.ENDPOINTS_URL.url() + "/" + Encoder.encode(endpointId), SkypeImpl.this)
                         .expect(200, "While registering endpoint")
-                        .header("Authentication", "skypetoken=" + skypeToken)
+                        .header("Authentication", "skypetoken=" + getSkypeToken())
                         .header("LockAndKey", Utils.generateChallengeHeader())
                         .put(new JsonObject().add("endpointFeatures", "Agent")))
                 .expect(201, "While registering endpoint")
-                .header("Authentication", "skypetoken=" + skypeToken)
+                .header("Authentication", "skypetoken=" + getSkypeToken())
                 .post(new JsonObject().add("endpointFeatures", "Agent"));
     }
 
@@ -389,7 +400,7 @@ public abstract class SkypeImpl implements Skype {
                     messageHost + "/users/ME/endpoints", this)
                     .expect(code -> code == 200 || code == 201 || code == 404, "While registering endpoint")
                     .header("LockAndKey", Utils.generateChallengeHeader())
-                    .header("Authentication", "skypetoken=" + skypeToken)
+                    .header("Authentication", "skypetoken=" + getSkypeToken())
                     .header("BehaviorOverride", "redirectAs404")
 
                     .on(200, (connection) -> {
@@ -467,7 +478,7 @@ public abstract class SkypeImpl implements Skype {
         data.put("ccid", Utils.coerceToString(trouterData.get("ccid")));
         data.put("v", "v2"); //TODO: MAGIC VALUE
         data.put("dom", "web.skype.com"); //TODO: MAGIC VALUE
-        data.put("auth", "true"); //TODO: MAGIC VALUE
+        data.put("refreshToken", "true"); //TODO: MAGIC VALUE
         data.put("tc", new JsonObject()
                 .add("cv", "2015.11.05")
                 .add("hr", "")
@@ -564,7 +575,8 @@ public abstract class SkypeImpl implements Skype {
         }
     }
 
-    public void reauthenticate() throws ConnectionException, InvalidCredentialsException, NotParticipatingException {
+    public void reAuthenticate() throws ConnectionException, InvalidCredentialsException, NotParticipatingException,
+            SkypeAuthenticationException {
         //todo: keep subscribed until reauth is finished so events aren't lost
         doShutdown();
         login();
@@ -574,7 +586,7 @@ public abstract class SkypeImpl implements Skype {
     }
 
     public String getRegistrationToken() {
-        return this.registrationToken;
+        return this.regtokenProvider.getRegistrationToken();
     }
 
     public void setRegistrationToken(String registrationToken) {
@@ -592,15 +604,7 @@ public abstract class SkypeImpl implements Skype {
     }
 
     public String getSkypeToken() {
-        return this.skypeToken;
-    }
-
-    public void setSkypeToken(String skypeToken) {
-        this.skypeToken = skypeToken;
-        String[] data = skypeToken.split("\\.");
-        JsonObject object = JsonObject.readFrom(
-                new String(Base64.getDecoder().decode(data[1]), StandardCharsets.UTF_8));
-        this.skypeTokenExpiryTime = object.get("exp").asLong() * 1000;
+        return getAuthProvider().getSkypeToken();
     }
 
     public String getCloud() {
@@ -632,7 +636,7 @@ public abstract class SkypeImpl implements Skype {
     }
 
     public String getUsername() {
-        return this.username;
+        return getAuthProvider().getUsername();
     }
 
     public UUID getGuid() {
@@ -668,19 +672,19 @@ public abstract class SkypeImpl implements Skype {
                 .cookies(cookies)
                 .header("Content-Type", "application/x-www-form-encoded")
                 .expect(204, "While fetching asmtoken")
-                .post("skypetoken=" + Encoder.encode(skypeToken));
+                .post("skypetoken=" + Encoder.encode(getSkypeToken()));
     }
 
     public boolean isAuthenticated() {
-        return System.currentTimeMillis() < skypeTokenExpiryTime;
+        return getExpirationTime().isAfter(Instant.now());
     }
 
     public boolean isRegistrationTokenValid() {
-        return System.currentTimeMillis() < registrationTokenExpiryTime;
+        return getRegtokenProvider().getRegistrationTokenExpiry().isAfter(Instant.now());
     }
 
-    public long getExpirationTime() {
-        return skypeTokenExpiryTime;
+    public Instant getExpirationTime() {
+        return getAuthProvider().getSkypeTokenExpiryTime();
     }
 
     public SkypeWebSocket getWebSocket() {
