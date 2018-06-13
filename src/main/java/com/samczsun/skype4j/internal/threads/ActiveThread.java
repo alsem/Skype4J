@@ -21,7 +21,10 @@ import com.samczsun.skype4j.exceptions.ConnectionException;
 import com.samczsun.skype4j.exceptions.handler.ErrorSource;
 import com.samczsun.skype4j.internal.Endpoints;
 import com.samczsun.skype4j.internal.SkypeImpl;
+import com.samczsun.skype4j.internal.Utils;
+import com.samczsun.skype4j.internal.utils.Encoder;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,11 +46,17 @@ public class ActiveThread extends Thread {
 
     public void run() {
         while (skype.isLoggedIn() && !stop.get()) {
-            if (skype.isAuthenticated() && !stop.get()) {
+            if (skype.isAuthenticated() && skype.isRegistrationTokenValid()) {
                 try {
-                    Endpoints.ACTIVE
-                            .open(skype, endpoint)
+                    Endpoints.ACTIVE.open(skype, endpoint)
+                            .header("BehaviorOverride","redirectAs404")
                             .expect(201, "While submitting active in " + this.getName())
+                            .on(404, (connection) -> Endpoints
+									.custom(Endpoints.ENDPOINTS_URL.url() + "/" + endpoint, skype)
+									.expect(200, "While refreshing endpoint")
+									.header("Authentication", "skypetoken=" + skype.getSkypeToken())
+									.header("LockAndKey", Utils.generateChallengeHeader())
+									.put(new JsonObject().add("endpointFeatures", "Agent")))
                             .post(new JsonObject().add("timeout", 12));
                 } catch (ConnectionException e) {
                     skype.handleError(ErrorSource.SESSION_ACTIVE, e, false);
@@ -56,9 +65,8 @@ public class ActiveThread extends Thread {
                     return;
                 }
                 try {
-                    Thread.sleep(12000);
-                } catch (InterruptedException ignored) {
-                }
+                    Thread.sleep(Duration.ofSeconds(12).toMillis());
+                } catch (InterruptedException ignored) {}
             } else {
                 return;
             }

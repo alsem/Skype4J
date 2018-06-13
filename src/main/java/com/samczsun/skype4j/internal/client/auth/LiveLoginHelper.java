@@ -1,4 +1,4 @@
-package com.samczsun.skype4j.internal.client;
+package com.samczsun.skype4j.internal.client.auth;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;

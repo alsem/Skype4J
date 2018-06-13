@@ -19,6 +19,8 @@ package com.samczsun.skype4j.internal.threads;
 import com.samczsun.skype4j.exceptions.handler.ErrorSource;
 import com.samczsun.skype4j.internal.SkypeImpl;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,27 +39,25 @@ public class AuthenticationChecker extends Thread {
 
     public void run() {
         while (skype.isLoggedIn() && !stop.get()) {
-            long diff = (skype.getExpirationTime() - System.currentTimeMillis());
-            if (diff > 1800000) { //30 min
+            //if token expired
+            boolean before = skype.getExpirationTime().isBefore(Instant.now());
+            if (before) {
                 if (stop.get()) {
                     return;
                 }
                 try {
-                    Thread.sleep(diff / 2);
-                } catch (InterruptedException ignored) {
-                }
-            } else {
-                if (stop.get()) {
-                    return;
-                }
-                try {
-                    skype.reauthenticate();
+                    skype.reAuthenticate();
                 } catch (Exception e) {
                     skype.handleError(ErrorSource.REAUTHENTICATING, e, true);
-                    //Don't see why you need to return in a finally block.
-                } finally {
-                    return;
                 }
+                return;
+            }
+            if (stop.get()) {
+                return;
+            }
+            try {
+                Thread.sleep(Duration.ofMinutes(2).toMillis());
+            } catch (InterruptedException ignored) {
             }
         }
     }

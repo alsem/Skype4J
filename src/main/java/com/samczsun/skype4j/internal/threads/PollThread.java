@@ -20,6 +20,7 @@ import com.eclipsesource.json.JsonObject;
 import com.eclipsesource.json.JsonValue;
 import com.samczsun.skype4j.exceptions.ConnectionException;
 import com.samczsun.skype4j.exceptions.handler.ErrorSource;
+import com.samczsun.skype4j.internal.EndpointConnection;
 import com.samczsun.skype4j.internal.Endpoints;
 import com.samczsun.skype4j.internal.EventType;
 import com.samczsun.skype4j.internal.ExceptionHandler;
@@ -52,7 +53,7 @@ public class PollThread extends Thread {
     public void run() {
         int pollId = 0;
         while (skype.isAuthenticated()) {
-            final Endpoints.EndpointConnection<HttpURLConnection> epconn = Endpoints.POLL
+            final EndpointConnection<HttpURLConnection> epconn = Endpoints.POLL
                     .open(skype, pollId)
                     .header("Content-Type", "application/json")
                     .dontConnect();
