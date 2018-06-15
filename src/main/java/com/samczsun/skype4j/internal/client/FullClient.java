@@ -23,7 +23,6 @@ import com.samczsun.skype4j.chat.GroupChat;
 import com.samczsun.skype4j.events.contact.ContactRequestEvent;
 import com.samczsun.skype4j.exceptions.ChatNotFoundException;
 import com.samczsun.skype4j.exceptions.ConnectionException;
-import com.samczsun.skype4j.exceptions.InvalidCredentialsException;
 import com.samczsun.skype4j.exceptions.SkypeAuthenticationException;
 import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
 import com.samczsun.skype4j.internal.Endpoints;
@@ -37,9 +36,7 @@ import com.samczsun.skype4j.internal.participants.info.ContactRequestImpl;
 import com.samczsun.skype4j.participants.info.Contact;
 
 import java.net.HttpURLConnection;
-import java.text.MessageFormat;
 import java.text.ParseException;
-import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -67,27 +64,20 @@ public class FullClient extends SkypeImpl {
 	}
 
 	@Override
-	public void login() throws InvalidCredentialsException, ConnectionException, SkypeAuthenticationException {
+	public void login() throws ConnectionException, SkypeAuthenticationException {
+
 		getAuthProvider().auth(this);
-
-		HttpURLConnection asmResponse = getAsmToken();
-
+		Endpoints.ELIGIBILITY_CHECK.open(this)
+				.expect(200, "You are not eligible to use Skype for Web!")
+				.get();
 		this.loggedIn.set(true);
-		loadAllContacts();
-		getContactRequests(false);
+		getAsmToken();
 		getRegtokenProvider().registerEndpoint(this, getSkypeToken());
-		super.login();
-	}
 
-	@Override public void reAuthenticate()
-			throws ConnectionException, InvalidCredentialsException, SkypeAuthenticationException {
-		//todo: keep subscribed until reauth is finished so events aren't lost
-		doShutdown();
-		login();
-		System.out.println(MessageFormat.format("{0}: Relogin successful", Instant.now().toString()));
-		if (subscribed.get()) {
-			subscribe();
-		}
+		loadAllContacts();
+		getContactRequests();
+
+		super.login();
 	}
 
 	@Override
@@ -119,7 +109,7 @@ public class FullClient extends SkypeImpl {
 	}
 
 	@Override
-	public void getContactRequests(boolean isRegisteredEndpoint) throws ConnectionException {
+	public void getContactRequests() throws ConnectionException {
 		JsonObject array = Endpoints.GET_CONTACT_REQUESTS
 				.open(this, getUsername()).as(JsonObject.class)
 				.expect(200, "While loading contact requests").get();

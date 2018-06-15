@@ -16,14 +16,6 @@
 
 package com.samczsun.skype4j.internal.participants.info;
 
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.util.UUID;
-import java.util.regex.Pattern;
-
-import org.apache.commons.lang3.StringUtils;
-import org.jsoup.helper.Validate;
-
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
 import com.samczsun.skype4j.Skype;
@@ -37,6 +29,13 @@ import com.samczsun.skype4j.internal.Utils;
 import com.samczsun.skype4j.internal.client.FullClient;
 import com.samczsun.skype4j.internal.utils.Encoder;
 import com.samczsun.skype4j.participants.info.Contact;
+import org.apache.commons.lang3.StringUtils;
+import org.jsoup.helper.Validate;
+
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.UUID;
+import java.util.regex.Pattern;
 
 public class ContactImpl implements Contact {
     private static final Pattern PHONE_NUMBER = Pattern.compile("\\+[0-9]+");
@@ -196,7 +195,8 @@ public class ContactImpl implements Contact {
     @Override
     public void authorize() throws ConnectionException {
 		Endpoints.AUTHORIZE_CONTACT_SELF.open(skype, StringUtils.prependIfMissing(this.username, "8:"))
-                .expect(200, "While adding to contact list").put();
+                .header("BehaviorOverride", "redirectAs404")
+                .expect(c -> c == 200 || c == 404, "While adding to contact list").put();
         updateContactInfo();
     }
 

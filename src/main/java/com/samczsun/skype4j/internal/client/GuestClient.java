@@ -18,7 +18,6 @@ package com.samczsun.skype4j.internal.client;
 
 import com.samczsun.skype4j.chat.GroupChat;
 import com.samczsun.skype4j.exceptions.ConnectionException;
-import com.samczsun.skype4j.exceptions.InvalidCredentialsException;
 import com.samczsun.skype4j.exceptions.SkypeAuthenticationException;
 import com.samczsun.skype4j.exceptions.handler.ErrorHandler;
 import com.samczsun.skype4j.internal.Endpoints;
@@ -53,9 +52,15 @@ public class GuestClient extends SkypeImpl {
 	}
 
 	@Override
-	public void login() throws ConnectionException, InvalidCredentialsException, SkypeAuthenticationException {
+	public void login() throws ConnectionException, SkypeAuthenticationException {
 
 		getAuthProvider().auth(this);
+		Endpoints.ELIGIBILITY_CHECK.open(this)
+				.expect(200, "You are not eligible to use Skype for Web!")
+				.get();
+
+		this.loggedIn.set(true);
+
 		getRegtokenProvider().registerEndpoint(this, getSkypeToken());
 
 		List<UncheckedRunnable> tasks = new ArrayList<>();
@@ -99,7 +104,7 @@ public class GuestClient extends SkypeImpl {
 	}
 
 	@Override
-	public void getContactRequests(boolean fromWebsocket) {
+	public void getContactRequests() {
 		throw new UnsupportedOperationException("Not supported with a guest account");
 	}
 

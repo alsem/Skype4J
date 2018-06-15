@@ -5,12 +5,14 @@ import com.samczsun.skype4j.Skype;
 import com.samczsun.skype4j.events.EventHandler;
 import com.samczsun.skype4j.events.Listener;
 import com.samczsun.skype4j.events.chat.message.MessageReceivedEvent;
+import com.samczsun.skype4j.exceptions.ChatNotFoundException;
 import com.samczsun.skype4j.exceptions.ConnectionException;
 import com.samczsun.skype4j.exceptions.InvalidCredentialsException;
 import com.samczsun.skype4j.exceptions.NotParticipatingException;
 import com.samczsun.skype4j.exceptions.SkypeAuthenticationException;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Scanner;
 import java.util.logging.Logger;
 
@@ -28,7 +30,9 @@ public class EntryPoint implements Runnable {
 	public static void main(String[] args)
 			throws InterruptedException, ConnectionException, NotParticipatingException, InvalidCredentialsException,
 			SkypeAuthenticationException {
-		Skype skype = new LiveLoginSkypeBuilder("a.semennikov@argustelecom.ru", "XeerwP5P").withAllResources()
+		String username = args[0];
+		String password = args[1];
+		Skype skype = new LiveLoginSkypeBuilder(username, password).withAllResources()
 				.withLogger(logger).build();
 		skype.login();
 		skype.getEventDispatcher().registerListener(new Listener() {
@@ -51,7 +55,7 @@ public class EntryPoint implements Runnable {
 				skype.logout();
 				break;
 			}
-			System.out.println("hello buddy");
+//			System.out.println("hello buddy");
 		}
 		System.out.println("It is broken!");
 	}

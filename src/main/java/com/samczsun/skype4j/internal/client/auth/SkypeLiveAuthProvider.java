@@ -41,6 +41,7 @@ public class SkypeLiveAuthProvider implements SkypeAuthProvider {
 			JsonObject object = LiveLoginHelper.getXTokenObject(originalUsername, password);
 			this.username = object.get("skypeid").asString();
 			this.skypeToken = object.get("skypetoken").asString();
+//			this.skypeTokenExpiryTime = Instant.now().plus(Duration.ofMinutes(5));
 			this.skypeTokenExpiryTime = Instant.now().plus(Duration.ofSeconds(object.get("expiresIn").asLong()));
 		} catch (Exception e) {
 			throw new SkypeAuthenticationException("Failed to get skype token", e);

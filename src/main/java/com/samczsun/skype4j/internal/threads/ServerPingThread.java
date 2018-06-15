@@ -40,32 +40,31 @@ public class ServerPingThread extends Thread {
 
     public void run() {
         while (skype.isLoggedIn() && !stop.get()) {
-            if (skype.isAuthenticated() && !stop.get()) {
-                try {
-                    Endpoints.PING_URL
-                            .open(skype)
-                            .expect(200, "While maintaining session")
-                            .header("Content-Type", "application/x-www-form-urlencoded")
-                            .cookies(skype.getCookies())
-                            .connect("POST", "sessionId=" + skype.getGuid().toString());
-                } catch (ConnectionException e) {
-                    skype.handleError(ErrorSource.SERVER_PING, e, false); // After reviewing source this appears correct
-                }
-                if (stop.get()) {
-                    return;
-                }
-                try {
-                    Thread.sleep(300000);
-                } catch (InterruptedException ignored) {
-                }
-            } else {
+            if (!skype.isAuthenticated() || stop.get()) {
                 return;
+            }
+            try {
+                Endpoints.PING_URL.open(skype)
+                        .expect(200, "While maintaining session")
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .cookies(skype.getCookies())
+                        .connect("POST", "sessionId=" + skype.getGuid().toString());
+            } catch (ConnectionException e) {
+                skype.handleError(ErrorSource.SERVER_PING, e, false); // After reviewing source this appears correct
+            }
+            if (stop.get()) {
+                return;
+            }
+            try {
+                Thread.sleep(300000);
+            } catch (InterruptedException ignored) {
             }
         }
     }
 
     public void kill() {
         this.stop.set(true);
+        System.out.println("ServerPingThread is shutting down");
         this.interrupt();
     }
 }

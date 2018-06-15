@@ -39,9 +39,17 @@ public class AuthenticationChecker extends Thread {
 
     public void run() {
         while (skype.isLoggedIn() && !stop.get()) {
-            //if token expired
-            boolean before = skype.getExpirationTime().isBefore(Instant.now());
-            if (before) {
+
+            boolean tokensStillValid = skype.isAuthenticated() && skype.isRegistrationTokenValid();
+            if (tokensStillValid) {
+                if (stop.get()) {
+                    return;
+                }
+                try {
+                    Thread.sleep(Duration.ofMinutes(10).toMillis());
+                } catch (InterruptedException ignored) {
+                }
+            } else {
                 if (stop.get()) {
                     return;
                 }
@@ -52,17 +60,11 @@ public class AuthenticationChecker extends Thread {
                 }
                 return;
             }
-            if (stop.get()) {
-                return;
-            }
-            try {
-                Thread.sleep(Duration.ofMinutes(2).toMillis());
-            } catch (InterruptedException ignored) {
-            }
         }
     }
 
     public void kill() {
         this.stop.set(true);
+        System.out.println("AuthenticationCheckerThread is shutting down");
     }
 }

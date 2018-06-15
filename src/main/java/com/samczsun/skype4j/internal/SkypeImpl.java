@@ -58,6 +58,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
+import java.text.MessageFormat;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -84,7 +86,7 @@ import java.util.regex.Pattern;
 public abstract class SkypeImpl implements Skype {
     public static final String LINE_SEPARATOR = System.getProperty("line.separator");
     public static final Pattern PAGE_SIZE_PATTERN = Pattern.compile("pageSize=([0-9]+)");
-    public static final String VERSION = "0.2.0-SNAPSHOT";
+    public static final String VERSION = "0.2.9-SNAPSHOT";
 
     protected final AtomicBoolean loggedIn = new AtomicBoolean(false);
     protected final AtomicBoolean shutdownRequested = new AtomicBoolean(false);
@@ -104,7 +106,8 @@ public abstract class SkypeImpl implements Skype {
     protected SkypeWebSocket wss;
     protected String conversationSyncState;
     protected Logger logger = Logger.getLogger(Skype.class.getCanonicalName());
-    private long skypeTokenExpiryTime;
+    @Deprecated
+    //TODO: replace with SkypeRegistrationProvider
     private String registrationToken;
     private long registrationTokenExpiryTime;
     private String cloud = "";
@@ -159,12 +162,12 @@ public abstract class SkypeImpl implements Skype {
     }
 
     @Override
-    public void login() throws ConnectionException, InvalidCredentialsException, SkypeAuthenticationException {
+    public void login() throws ConnectionException, SkypeAuthenticationException {
         Endpoints.ELIGIBILITY_CHECK.open(this)
                 .expect(200, "You are not eligible to use Skype for Web!")
                 .get();
 
-        this.loggedIn.set(true);
+        this.loggedIn.compareAndSet(false,true);
         if (this.serverPingThread != null) {
             this.serverPingThread.kill();
             this.serverPingThread = null;
@@ -173,7 +176,7 @@ public abstract class SkypeImpl implements Skype {
             this.reauthThread.kill();
             this.reauthThread = null;
         }
-        if (scheduler != null) {
+        if (scheduler != null && !scheduler.isTerminated()) {
             scheduler.shutdownNow();
             while (!scheduler.isTerminated()) ;
         }
@@ -277,10 +280,6 @@ public abstract class SkypeImpl implements Skype {
             this.serverPingThread.kill();
             this.serverPingThread = null;
         }
-        if (this.activeThread != null) {
-            this.activeThread.kill();
-            this.activeThread = null;
-        }
         if (this.reauthThread != null) {
             this.reauthThread.kill();
             this.reauthThread = null;
@@ -290,6 +289,10 @@ public abstract class SkypeImpl implements Skype {
             this.wss = null;
         }
 
+        if (scheduler != null && !scheduler.isTerminated()) {
+            scheduler.shutdownNow();
+            while(!scheduler.isTerminated());
+        }
     }
 
     public void updateCloud(String anyLocation) {
@@ -375,75 +378,7 @@ public abstract class SkypeImpl implements Skype {
         return botInfo;
     }
 
-    protected void registerEndpoint() throws ConnectionException {
-        Endpoints.ENDPOINTS_URL
-                .open(this)
-                .noRedirects()
-                .on(301, (connection) -> Endpoints
-                        .custom(Endpoints.ENDPOINTS_URL.url() + "/" + Encoder.encode(endpointId), SkypeImpl.this)
-                        .expect(200, "While registering endpoint")
-                        .header("Authentication", "skypetoken=" + getSkypeToken())
-                        .header("LockAndKey", Utils.generateChallengeHeader())
-                        .put(new JsonObject().add("endpointFeatures", "Agent")))
-                .expect(201, "While registering endpoint")
-                .header("Authentication", "skypetoken=" + getSkypeToken())
-                .post(new JsonObject().add("endpointFeatures", "Agent"));
-    }
-
-    protected void registerEndpointLocationFirst() throws ConnectionException {
-
-        String messageHost = "https://client-s.gateway.messenger.live.com/v1";
-        //return token, expiry, msgsHost, endpoint
-        while (this.registrationToken == null) {
-
-            HttpURLConnection post = Endpoints.custom(
-                    messageHost + "/users/ME/endpoints", this)
-                    .expect(code -> code == 200 || code == 201 || code == 404, "While registering endpoint")
-                    .header("LockAndKey", Utils.generateChallengeHeader())
-                    .header("Authentication", "skypetoken=" + getSkypeToken())
-                    .header("BehaviorOverride", "redirectAs404")
-
-                    .on(200, (connection) -> {
-                        if (endpointId == null) {
-                            JsonArray convert = Endpoints.convert(JsonArray.class, this, connection);
-                            endpointId = convert.get(0).asObject().get("id").asString();
-                        }
-                        return connection;
-                    })
-                    .post(new JsonObject().add("endpointFeatures", "Agent"));
-            String regTokenHead = post.getHeaderField("Set-RegistrationToken");
-            String locationHead = post.getHeaderField("Location");
-            if (locationHead != null) {
-                Matcher m = Pattern.compile("(https://[^/]+/v1)/users/ME/endpoints/%7B([a-z0-9\\-]+)%7D")
-                        .matcher(locationHead);
-                if (m.matches()) {
-                    if (m.group(2) != null) {
-                        this.endpointId = "{" + m.group(2) + "}";
-                    }
-
-                    if (!m.group(0).equals(messageHost)) {
-                        // Skype is requiring the use of a different hostname.
-                        messageHost = m.group(1);
-                        //update cloud prefix to use in queries
-                        updateCloud(locationHead);
-                        //Don't accept the token if present, we need to re-register first.
-                        continue;
-                    }
-                }
-            }
-            if (regTokenHead != null) {
-                String[] splits = regTokenHead.split(";");
-                this.registrationToken = splits[0];
-                this.registrationTokenExpiryTime = Long.parseLong(splits[1].substring("expires=".length() + 1)) * 1000;
-                if (splits.length > 2) {
-                    this.endpointId = splits[2].split("=")[1];
-                }
-            }
-        }
-    }
-
-
-    public abstract void getContactRequests(boolean fromWebsocket) throws ConnectionException;
+    public abstract void getContactRequests() throws ConnectionException;
 
     public abstract void updateContactList() throws ConnectionException;
 
@@ -580,13 +515,14 @@ public abstract class SkypeImpl implements Skype {
         //todo: keep subscribed until reauth is finished so events aren't lost
         doShutdown();
         login();
+        System.out.println(MessageFormat.format("{0}: Relogin successful", Instant.now().toString()));
         if (subscribed.get()) {
             subscribe();
         }
     }
 
     public String getRegistrationToken() {
-        return this.regtokenProvider.getRegistrationToken();
+        return getRegtokenProvider().getRegistrationToken();
     }
 
     public void setRegistrationToken(String registrationToken) {

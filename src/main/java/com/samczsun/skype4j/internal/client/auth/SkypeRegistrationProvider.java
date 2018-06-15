@@ -24,7 +24,7 @@ public class SkypeRegistrationProvider {
 	private String registrationToken;
 	private Instant registrationTokenExpiry;
 	private String endpointId;
-	private ActiveThread activeThread;
+	private ActiveThread endpointCheckActiveThread;
 
 	public Instant getRegistrationTokenExpiry() {
 		return registrationTokenExpiry;
@@ -60,24 +60,29 @@ public class SkypeRegistrationProvider {
 			if (regTokenHead != null) {
 				String[] splits = regTokenHead.split(";");
 				this.registrationToken = splits[0];
+				newRegToken = this.registrationToken;
 				long expiresInMillis = Long.parseLong(splits[1].split("=")[1]);
+//				this.registrationTokenExpiry = Instant.now().plus(Duration.ofMinutes(7));
 				this.registrationTokenExpiry = Instant.ofEpochMilli(Duration.ofSeconds(expiresInMillis).toMillis());
 				if (splits.length > 2) {
 					this.endpointId = splits[2].split("=")[1];
-					if (this.activeThread != null) {
-						this.activeThread.kill();
-						this.activeThread = null;
-					}
-					(activeThread = new ActiveThread(skype, Encoder.encode(endpointId))).start();
 				}
 			}
-			newRegToken = this.registrationToken;
 		}
 
 		Endpoints.MESSAGINGSERVICE_URL
 				.open(skype, Encoder.encode(endpointId))
 				.expect(200, "While submitting messagingservice")
 				.put(buildRegistrationObject());
+
+		if (endpointId != null) {
+			if (this.endpointCheckActiveThread != null) {
+				this.endpointCheckActiveThread.kill();
+				this.endpointCheckActiveThread = null;
+			}
+
+			(this.endpointCheckActiveThread = new ActiveThread(skype, Encoder.encode(endpointId))).start();
+		}
 	}
 
 	protected JsonObject buildRegistrationObject() {
@@ -102,8 +107,9 @@ public class SkypeRegistrationProvider {
 			throws ConnectionException {
 		return Endpoints.ENDPOINTS_URL.open(skype)
 				.noRedirects()
+				.dontConnect()
 				.on(301, (connection) -> followRedirectToRegisteredEndpoint(skype, skypeToken))
-				.expect(code -> code == 201, "While registering endpoint")
+				.expect(code -> code == 201 || code == 404, "While registering endpoint")
 				.header("Authentication", "skypetoken=" + skypeToken)
 				.header("LockAndKey", Utils.generateChallengeHeader())
 				.header("BehaviorOverride", "redirectAs404")
