@@ -1,14 +1,18 @@
 package com.samczsun.skype4j.internal;
 
+import com.eclipsesource.json.JsonArray;
+import com.eclipsesource.json.JsonObject;
 import com.eclipsesource.json.JsonValue;
 import com.samczsun.skype4j.exceptions.ConnectionException;
 import com.samczsun.skype4j.internal.utils.Encoder;
 
+import javax.imageio.ImageIO;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -22,19 +26,31 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
  * @author a.semennikov
  */
 public class EndpointConnection<E_TYPE> {
+	static Map<Class<?>, Converter<?>> converters = new HashMap<>();
+
+	static {
+		converters.put(InputStream.class, HttpURLConnection::getInputStream);
+		converters.put(HttpURLConnection.class, in -> in);
+		converters.put(JsonObject.class, in -> Utils.parseJsonObject(in.getInputStream()));
+		converters.put(JsonArray.class, in -> Utils.parseJsonArray(in.getInputStream()));
+		converters.put(String.class, in -> StreamUtils.readFully(in.getInputStream()));
+		converters.put(BufferedImage.class, in -> ImageIO.read(in.getInputStream()));
+	}
+
 	private Class<E_TYPE> clazz = (Class<E_TYPE>) HttpURLConnection.class;
 	private Endpoints endpoint;
 	private SkypeImpl skype;
 	private Object[] args;
 	private Map<String, String> headers = new HashMap<>();
 	private Map<String, String> cookies = new HashMap<>();
-	private Map<Predicate<Integer>, Endpoints.UncheckedFunction<E_TYPE>> errors = new HashMap<>();
+	private Map<Predicate<Integer>, UncheckedFunction<E_TYPE>> errors = new HashMap<>();
 	private URL url;
 	private String cause;
 	private boolean dontConnect;
@@ -47,6 +63,10 @@ public class EndpointConnection<E_TYPE> {
 		header("User-Agent",
 				"Mozilla/5.0 (Windows NT 10; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.73 Safari/537.36 Skype4J/"
 						+ SkypeImpl.VERSION);
+	}
+
+	public static <T> T convert(Class<?> type, SkypeImpl skype, HttpURLConnection in) throws IOException {
+		return (T) converters.get(type).convert(in);
 	}
 
 	public EndpointConnection<E_TYPE> header(String key, String val) {
@@ -64,11 +84,11 @@ public class EndpointConnection<E_TYPE> {
 		return this;
 	}
 
-	public EndpointConnection<E_TYPE> on(int code, Endpoints.UncheckedFunction<E_TYPE> action) {
+	public EndpointConnection<E_TYPE> on(int code, UncheckedFunction<E_TYPE> action) {
 		return on(x -> x == code, action);
 	}
 
-	public EndpointConnection<E_TYPE> on(Predicate<Integer> check, Endpoints.UncheckedFunction<E_TYPE> result) {
+	public EndpointConnection<E_TYPE> on(Predicate<Integer> check, UncheckedFunction<E_TYPE> result) {
 		this.errors.put(check, result);
 		return this;
 	}
@@ -79,7 +99,7 @@ public class EndpointConnection<E_TYPE> {
 
 	public EndpointConnection<E_TYPE> expect(Predicate<Integer> check, String cause) {
 		this.cause = cause;
-		return on(check, (connection) -> Endpoints.convert(clazz, skype, connection));
+		return on(check, (connection) -> convert(clazz, skype, connection));
 	}
 
 	public EndpointConnection<E_TYPE> noRedirects() {
@@ -190,7 +210,7 @@ public class EndpointConnection<E_TYPE> {
 				}
 			}
 			if (!this.dontConnect) {
-				for (Map.Entry<Predicate<Integer>, Endpoints.UncheckedFunction<E_TYPE>> entry : errors.entrySet()) {
+				for (Map.Entry<Predicate<Integer>, UncheckedFunction<E_TYPE>> entry : errors.entrySet()) {
 					if (entry.getKey().test(connection.getResponseCode())) {
 						try {
 							return entry.getValue().apply(connection);
@@ -272,5 +292,22 @@ public class EndpointConnection<E_TYPE> {
 					.append(";");
 		}
 		return result.toString();
+	}
+
+	public interface Converter<T> {
+		T convert(HttpURLConnection connection) throws IOException;
+	}
+
+	public interface UncheckedFunction<R> extends Function<HttpURLConnection, R> {
+		default R apply(HttpURLConnection httpURLConnection) {
+			try {
+				return apply0(httpURLConnection);
+			} catch (Throwable t) {
+				Utils.sneakyThrow(t);
+			}
+			return null;
+		}
+
+		R apply0(HttpURLConnection httpURLConnection) throws Throwable;
 	}
 }

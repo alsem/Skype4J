@@ -31,20 +31,6 @@ import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
 
 public class Endpoints {
-    private static Map<Class<?>, Converter<?>> converters = new HashMap<>();
-
-    static {
-        converters.put(InputStream.class, HttpURLConnection::getInputStream);
-        converters.put(HttpURLConnection.class, in -> in);
-        converters.put(JsonObject.class, in -> Utils.parseJsonObject(in.getInputStream()));
-        converters.put(JsonArray.class, in -> Utils.parseJsonArray(in.getInputStream()));
-        converters.put(String.class, in -> StreamUtils.readFully(in.getInputStream()));
-        converters.put(BufferedImage.class, in -> ImageIO.read(in.getInputStream()));
-    }
-
-    public static <T> T convert(Class<?> type, SkypeImpl skype, HttpURLConnection in) throws IOException {
-        return (T) converters.get(type).convert(in);
-    }
 
     public static final Provider<String> AUTHORIZATION = skype -> "skype_token " + skype.getSkypeToken();
     public static final Provider<String> COOKIE = skype -> "skypetoken_asm=" + skype.getSkypeToken();
@@ -249,20 +235,4 @@ public class Endpoints {
         T provide(SkypeImpl skype);
     }
 
-    public interface Converter<T> {
-        T convert(HttpURLConnection connection) throws IOException;
-    }
-
-    public interface UncheckedFunction<R> extends Function<HttpURLConnection, R> {
-        default R apply(HttpURLConnection httpURLConnection) {
-            try {
-                return apply0(httpURLConnection);
-            } catch (Throwable t) {
-                Utils.sneakyThrow(t);
-            }
-            return null;
-        }
-
-        R apply0(HttpURLConnection httpURLConnection) throws Throwable;
-    }
 }
