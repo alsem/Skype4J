@@ -165,6 +165,12 @@ public class BotInfoImpl implements BotInfo {
             throw Skype.UNEXPECTED;
         }
 
+        if (descriptions.isEmpty()) {
+            this.displayName = uuid;
+            this.description = this.getClass().getSimpleName();
+            return;
+        }
+
         JsonObject object = descriptions.get(0).asObject();
 
         this.displayName = Utils.getString(object, "displayName");
